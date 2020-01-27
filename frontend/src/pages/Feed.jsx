@@ -1,5 +1,6 @@
 import React, {Component} from 'react'
 import api from '../services/api'
+import io from 'socket.io-client'
 
 import './Feed.css'
 import more from '../assets/images/more.svg'
@@ -14,44 +15,69 @@ class Feed extends Component{
     }
 
     async componentDidMount(){
-        //try{
-            let response = await api.get('posts')
 
-            this.setState({ feed: response.data })
-        //}
+        this.registerToSocket();
+
+        let response = await api.get('posts')
+
+        this.setState({ feed: response.data })
     }
+
+    registerToSocket = () => {
+        const socket = io('http://localhost:3333');
+
+        socket.on('post', newPost => {
+            this.setState({
+                feed: [newPost, ...this.state.feed]
+            })
+        })
+
+        socket.on('like', likedPost => {
+            this.setState({
+                feed: this.state.feed.map(post => 
+                    post._id === likedPost._id ? likedPost : post
+                )
+            })
+        })
+    }
+
+    handleLike = id => {
+        api.post(`/posts/${id}/likes`)
+    }
+
     render() {
         return (
             <section id="post-list">
-                { this.state.feed.map( post => {
-                    
-                }) }
-                <article>
-                    <header>
-                        <div className="user-info">
-                            <span>Vitor Alves</span>
-                            <span className="place">Osasco</span>
-                        </div>
-                        <img src={more} alt="Mais" />
-                    </header>
+                { this.state.feed.map( post => (
+                    <article key={post._id}>
+                        <header>
+                            <div className="user-info">
+                                <span>{post.author}</span>
+                                <span className="place">{post.place}</span>
+                            </div>
+                            <img src={more} alt="Mais" />
+                        </header>
 
-                    <img src="http://localhost:3333/files/module-6.jpg" alt="imagem" />
+                        <img src={`http://localhost:3333/files/${post.image}`} alt="imagem" />
 
-                    <footer>
-                        <div className="actions">
-                            <img src={like} alt="like"/>
-                            <img src={comment} alt="Comentário"/>
-                            <img src={send} alt="Enviar"/>
-                        </div>
+                        <footer>
+                            <div className="actions">
+                                <button type="button" onClick={() => this.handleLike(post._id)}>
+                                    <img src={like} alt="like"/>
+                                </button>
+                                <img src={comment} alt="Comentário"/>
+                                <img src={send} alt="Enviar"/>
+                            </div>
 
-                        <strong>900 curtidas</strong>
+                            <strong>{post.likes} curtidas</strong>
 
-                        <p>
-                            Um Post qualquer por ai champs
-                            <span>#react #top</span>
-                        </p>
-                    </footer>
-                </article>
+                            <p>
+                                {post.description}
+                                <span>{post.hashtags}</span>
+                            </p>
+                        </footer>
+                    </article>
+                )) }
             </section>
         )
     }
